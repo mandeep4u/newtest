@@ -10,7 +10,7 @@ STEPS = [
     {
       "name": "create_project",
       "module": "scripts.create_project",
-      "func": "run_project_creation",              # <-- your function
+      "func": "run_project_creation",
       "args": {"region": "us", "env": "uat", "appPostfix": "aiagent-nav", "lob": "adv"}
     },
     {
