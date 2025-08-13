@@ -82,16 +82,4 @@ jobs:
 
       - name: Add + verify project label (no new APIs)
         run: |
-          set -euo pipefail
-          TARGET="${{ inputs.target_project }}"
-          STAMP="wifsmoke-$(date +%s)"
-
-          # Add a temporary label
-          gcloud projects update "$TARGET" --update-labels wif_smoke="$STAMP"
-
-          # Show it (proves which project was modified)
-          echo "Project labels for $TARGET:"
-          gcloud projects describe "$TARGET" --format='yaml(projectId,projectNumber,labels)'
-
-          # (optional) clean up label
-          gcloud projects update "$TARGET" --remove-labels wif_smoke
+          python enabled_apis.py prj-ca-test1-nav1-dev
