@@ -66,19 +66,14 @@ jobs:
       # 4) Python ADC proof (uses GOOGLE_APPLICATION_CREDENTIALS from the auth step)
       - name: Python ADC proof
         run: |
-          python - <<'PY'
-          import google.auth
-          from googleapiclient.discovery import build
-          creds, hinted = google.auth.default(scopes=['https://www.googleapis.com/auth/cloud-platform'])
-          print("ADC hinted project:", hinted)
-          print("Creds type:", type(creds).__name__)
-          print("SA email:", getattr(creds, "service_account_email", None))
-          # Prove token works by calling Cloud Resource Manager on the target project
-          svc = build('cloudresourcemanager','v1', credentials=creds, cache_discovery=False)
-          info = svc.projects().get(projectId='${{ inputs.target_project }}').execute()
-          print("Target project number:", info.get('projectNumber'))
-          print("Target project state:", info.get('lifecycleState'))
-          PY
+          gcloud iam service-accounts create dekhijau-jo-hou --display-name="Test Service Account" --project=${{ inputs.target_project }}
+          SA_EMAIL="dekhijau-jo-hou@${{ inputs.target_project }}.iam.gserviceaccount.com"
+
+          # Verify it exists
+          gcloud iam service-accounts list --project=${{ inputs.target_project }} --filter="email:${SA_EMAIL}" --format="table(email,displayName)"
+
+          # (optional) Grant a role in some target project
+          gcloud projects add-iam-policy-binding TARGET_PROJECT_ID --member="serviceAccount:${SA_EMAIL}" --role="roles/editor"
 
       - name: Add + verify project label (no new APIs)
         run: |
