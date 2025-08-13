@@ -79,3 +79,16 @@ jobs:
           print("Target project number:", info.get('projectNumber'))
           print("Target project state:", info.get('lifecycleState'))
           PY
+
+      - name: Create + verify Pub/Sub topic in target project
+        run: |
+          set -euo pipefail
+          TARGET="${{ inputs.target_project }}"
+          TOPIC="wif-smoke-$(date +%Y%m%d-%H%M%S)"
+          gcloud services enable pubsub.googleapis.com --project "$TARGET"
+          gcloud pubsub topics create "$TOPIC" --project "$TARGET"
+          echo "Created: projects/$TARGET/topics/$TOPIC"
+          gcloud pubsub topics describe "$TOPIC" --project "$TARGET"
+
+          # (optional) clean up so nothing lingers
+          gcloud pubsub topics delete "$TOPIC" --project "$TARGET" --quiet
