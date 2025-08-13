@@ -1,0 +1,66 @@
+name: WIF Auth Smoke Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "WIF provider resource (projects/123.../locations/global/workloadIdentityPools/POOL/providers/PROVIDER)"
+        required: true
+        default: 'projects/771423206690/locations/global/workloadIdentityPools/gh-actions-script-mandeep-test/providers/gh-oidc-script-mandeep-test'
+      service_account:
+        description: "Impersonated SA email (sa-name@sa-project.iam.gserviceaccount.com)"
+        required: true
+        default: 'sa-prj-ca-test1-nav1-dev@test1-a-468317.iam.gserviceaccount.com'
+      target_project:
+        description: "Project ID to verify access against"
+        required: true
+        default: 'prj-ca-test1-nav1-dev'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1) Federate GitHub OIDC -> access token for your service account
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ inputs.provider }}
+          service_account: ${{ inputs.service_account }}
+          token_format: 'access_token'
+          create_credentials_file: true    # sets GOOGLE_APPLICATION_CREDENTIALS for ADC too
+
+      # 2) Install gcloud bound to the same creds
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ inputs.target_project }}
+
+      # (Optional) whoami
+      - name: Show active identity
+        run: |
+          gcloud auth list
+          gcloud config list
+
+      # 3) Simple gcloud call against the target project
+      - name: gcloud call (services list)
+        run: |
+          gcloud config set project "${{ inputs.target_project }}"
+          # Will succeed if SA has at least viewer in the target project
+          gcloud services list --enabled --project "${{ inputs.target_project }}" || true
+
+      # 4) Python ADC proof (uses GOOGLE_APPLICATION_CREDENTIALS from the auth step)
+      - name: Python ADC proof
+        run: |
+          python - <<'PY'
+          import google.auth
+          from googleapiclient.discovery import build
+          creds, hinted = google.auth.default(scopes=['https://www.googleapis.com/auth/cloud-platform'])
+          print("ADC hinted project:", hinted)
+          print("Creds type:", type(creds).__name__)
+          print("SA email:", getattr(creds, "service_account_email", None))
+          # Prove token works by calling Cloud Resource Manager on the target project
+          svc = build('cloudresourcemanager','v1', credentials=creds, cache_discovery=False)
+          info = svc.projects().get(projectId='${{ inputs.target_project }}').execute()
+          print("Target project number:", info.get('projectNumber'))
+          print("Target project state:", info.get('lifecycleState'))
+          PY
