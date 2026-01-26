@@ -56,6 +56,20 @@ sed_inplace() {
   fi
 }
 
+set_origin_with_token() {
+  local org_base="$1"   # e.g. https://github.com/<org>
+  local repo="$2"       # repo name
+  local token="${3:-}"
+
+  [ -n "${token:-}" ] || return 0
+
+  local org_path
+  org_path="$(echo "${org_base%/}" | sed -E 's|^https?://github\.com/||')"
+  # org_path becomes: mandeep4u
+
+  git remote set-url origin "https://x-access-token:${token}@github.com/${org_path}/${repo}.git"
+}
+
 strip_snapshot() { echo "$1" | sed 's/-SNAPSHOT$//'; }
 
 # Normalize repo spec to clone URL
@@ -317,6 +331,9 @@ while IFS= read -r repo || [ -n "$repo" ]; do
   pushd "$repo" >/dev/null
   trap 'popd >/dev/null 2>&1 || true' RETURN
 
+  # Ensure push uses authenticated remote in CI
+  set_origin_with_token "$ORG_NAME" "$repo" "${CHILD_TOKEN:-}"
+  
   default_branch="$(get_default_branch || true)"
   [ -n "${default_branch:-}" ] || default_branch="main"
   echo "** Default branch detected: $default_branch"
