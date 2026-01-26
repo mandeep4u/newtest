@@ -1,0 +1,67 @@
+name: Upgrade dependency versions
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_repo:
+        description: "Parent repo spec (org/repo or url)"
+        required: true
+      tags:
+        description: "Comma-separated tag names (e.g. tardis.suffix,ch.suffix)"
+        required: true
+        default: "tardis.suffix,ch.suffix"
+      patch:
+        type: boolean
+        required: false
+        default: true
+      create_pr:
+        type: boolean
+        required: false
+        default: true
+
+permissions: {}  # we are using PATs, not GITHUB_TOKEN
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout runner repo
+        uses: actions/checkout@v4
+
+      - name: Setup git identity
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Authenticate gh with CHILD_TOKEN
+        env:
+          CHILD_TOKEN: ${{ secrets.CHILD_TOKEN }}
+        run: |
+          echo "$CHILD_TOKEN" | gh auth login --with-token
+
+      - name: Run upgrade script
+        env:
+          PARENT_TOKEN: ${{ secrets.PARENT_TOKEN }}
+          CHILD_TOKEN:  ${{ secrets.CHILD_TOKEN }}
+        run: |
+          set -euo pipefail
+          chmod +x ./upgrade.sh
+
+          ARGS=(--from-repo "${{ inputs.from_repo }}")
+
+          IFS=',' read -ra TAGS <<< "${{ inputs.tags }}"
+          for t in "${TAGS[@]}"; do
+            t="$(echo "$t" | xargs)"
+            [ -n "$t" ] && ARGS+=(--tag "$t")
+          done
+
+          if [ "${{ inputs.patch }}" = "true" ]; then
+            ARGS+=(--patch)
+          fi
+
+          if [ "${{ inputs.create_pr }}" = "true" ]; then
+            ARGS+=(--pr)
+          fi
+
+          echo "Running: ./upgrade.sh ${ARGS[*]}"
+          ./upgrade.sh "${ARGS[@]}"
