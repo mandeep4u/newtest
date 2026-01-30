@@ -92,6 +92,19 @@ normalize_repo_to_url() {
   echo "${ORG_NAME%/}/${spec}.git"
 }
 
+with_token_url() {
+  local url="$1"
+  local token="${2:-}"
+  [ -n "${token:-}" ] || { echo "$url"; return; }
+
+  # Convert https://github.com/org/repo.git -> https://x-access-token:TOKEN@github.com/org/repo.git
+  if [[ "$url" =~ ^https://github\.com/ ]]; then
+    echo "${url/https:\/\/github.com\//https:\/\/x-access-token:${token}@github.com/}"
+  else
+    echo "$url"
+  fi
+}
+
 # -----------------------------
 # XML helpers (sed/awk only - no formatting changes)
 # -----------------------------
@@ -209,15 +222,12 @@ resolve_missing_tag_versions_from_parent() {
 
   local parent_url
   parent_url="$(normalize_repo_to_url "$SOURCE_REPO")"
+  parent_url_auth="$(with_token_url "$parent_url" "${PARENT_TOKEN:-}")"
 
-  echo "Auto-resolving missing tag versions from parent repo: $SOURCE_REPO"
   echo "Parent clone URL: $parent_url"
+  [ -n "${PARENT_TOKEN:-}" ] && echo "Parent auth: using PARENT_TOKEN"
 
-  local tmp_dir
-  tmp_dir="$(mktemp -d ".tmp_parent_repo.XXXXXX")"
-  trap 'rm -rf "$tmp_dir" >/dev/null 2>&1 || true' RETURN
-
-  git clone --depth 1 "$parent_url" "$tmp_dir" >/dev/null
+  git clone --depth 1 "$parent_url_auth" "$tmp_dir" >/dev/null
 
   [ -f "$tmp_dir/pom.xml" ] || die "Parent repo pom.xml not found at repo root."
 
@@ -344,7 +354,8 @@ while IFS= read -r repo || [ -n "$repo" ]; do
 
   child_url="${ORG_NAME%/}/${repo}.git"
   echo "** Cloning: $child_url"
-  git clone --depth 1 "$child_url" "$repo"
+  child_url_auth="$(with_token_url "${child_url%.git}.git" "${CHILD_TOKEN:-}")"
+  git clone --depth 1 "$child_url_auth" "$repo"
 
   pushd "$repo" >/dev/null
   trap 'popd >/dev/null 2>&1 || true' RETURN
