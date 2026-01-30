@@ -257,6 +257,20 @@ while [ $# -gt 0 ]; do
       ;;
     --tag)
       [ $# -lt 2 ] && die "--tag requires <TAG_NAME> [TAG_VERSION]"
+
+      # Support --tag name=version (single token)
+      if [[ "$2" == *"="* ]]; then
+        name="${2%%=*}"
+        ver="${2#*=}"
+        [ -z "${name:-}" ] && die "Invalid --tag format (empty name): $2"
+        [ -z "${ver:-}" ]  && die "Invalid --tag format (empty version): $2"
+        TAG_NAMES+=("$name")
+        TAG_VERSIONS+=("$ver")
+        echo "TAG: $name -> $ver"
+        shift 2
+        break
+      fi
+
       TAG_NAMES+=("$2")
 
       if [ $# -ge 3 ] && [[ "${3:-}" != --* ]]; then
