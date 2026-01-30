@@ -226,7 +226,11 @@ resolve_missing_tag_versions_from_parent() {
       local tag="${TAG_NAMES[$i]}"
       local val
       val="$(get_xml_tag_value "$tag" "$tmp_dir/pom.xml" || true)"
-      [ -n "${val:-}" ] || die "Tag <$tag> not found in parent repo pom.xml."
+      if [ -z "${val:-}" ]; then
+        warn "Tag <$tag> not found in parent repo pom.xml (skipping this tag)."
+        TAG_VERSIONS[$i]=""   # keep empty → child processing will skip
+        continue
+      fi
       TAG_VERSIONS[$i]="$val"
       echo "Resolved <$tag> = $val"
     fi
